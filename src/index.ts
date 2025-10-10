@@ -1,4 +1,5 @@
 import * as core from '@actions/core'
+import * as github from '@actions/github'
 import { detectCommitInfo } from './commit'
 import { findCoverageFiles } from './files'
 import { uploadCoverage } from './upload'
@@ -8,7 +9,18 @@ async function run(): Promise<void> {
     // Get inputs
     const apiKey = core.getInput('api-key', { required: true })
     const repository = core.getInput('repository') || process.env.GITHUB_REPOSITORY || ''
-    const branch = core.getInput('branch') || process.env.GITHUB_REF_NAME || ''
+
+    // Determine branch name: For PRs use head ref, otherwise use ref name
+    let branch = core.getInput('branch')
+    if (!branch) {
+      const context = github.context
+      if (context.eventName === 'pull_request' && context.payload.pull_request) {
+        branch = context.payload.pull_request.head.ref
+      } else {
+        branch = process.env.GITHUB_REF_NAME || ''
+      }
+    }
+
     const coverageFilesPattern = core.getInput('coverage-files')
     const failOnError = core.getInput('fail-on-error') === 'true'
     const apiUrl = core.getInput('api-url') || 'https://api.covera.gg'

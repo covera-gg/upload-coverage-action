@@ -32589,6 +32589,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(6966));
+const github = __importStar(__nccwpck_require__(4903));
 const commit_1 = __nccwpck_require__(4525);
 const files_1 = __nccwpck_require__(5713);
 const upload_1 = __nccwpck_require__(1773);
@@ -32597,7 +32598,17 @@ async function run() {
         // Get inputs
         const apiKey = core.getInput('api-key', { required: true });
         const repository = core.getInput('repository') || process.env.GITHUB_REPOSITORY || '';
-        const branch = core.getInput('branch') || process.env.GITHUB_REF_NAME || '';
+        // Determine branch name: For PRs use head ref, otherwise use ref name
+        let branch = core.getInput('branch');
+        if (!branch) {
+            const context = github.context;
+            if (context.eventName === 'pull_request' && context.payload.pull_request) {
+                branch = context.payload.pull_request.head.ref;
+            }
+            else {
+                branch = process.env.GITHUB_REF_NAME || '';
+            }
+        }
         const coverageFilesPattern = core.getInput('coverage-files');
         const failOnError = core.getInput('fail-on-error') === 'true';
         const apiUrl = core.getInput('api-url') || 'https://api.covera.gg';
