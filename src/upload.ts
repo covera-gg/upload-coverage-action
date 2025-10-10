@@ -100,6 +100,6 @@ export async function uploadCoverage(options: UploadOptions): Promise<UploadResu
 
   return {
     reportId: result.report_id || result.id || 'unknown',
-    reportUrl: result.report_url || `${apiUrl.replace('/api', '')}/reports/${result.report_id || result.id}`,
+    reportUrl: result.report_url || '', // API should provide the report URL
   }
 }
