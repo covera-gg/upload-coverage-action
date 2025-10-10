@@ -32411,50 +32411,27 @@ const github = __importStar(__nccwpck_require__(4903));
 const child_process_1 = __nccwpck_require__(7698);
 /**
  * Detects commit information from GitHub context
- * Handles both PR and push events
+ * Handles both PR and push events using only GitHub context data
  */
 async function detectCommitInfo() {
     const context = github.context;
     const eventName = context.eventName;
     core.debug(`Event name: ${eventName}`);
-    // For pull_request events
+    // For pull_request events - use PR data directly from context
     if (eventName === 'pull_request' && context.payload.pull_request) {
         const pr = context.payload.pull_request;
-        const sha = pr.head.sha;
-        core.debug(`PR event detected, head SHA: ${sha}`);
-        // Use gh CLI to fetch commit details (requires GH_TOKEN)
-        try {
-            const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
-            if (!token) {
-                throw new Error('GITHUB_TOKEN or GH_TOKEN environment variable is required for PR events');
-            }
-            // Fetch commit details using GitHub API via gh CLI
-            const commitJson = (0, child_process_1.execSync)(`gh api repos/${context.repo.owner}/${context.repo.repo}/commits/${sha}`, {
-                encoding: 'utf-8',
-                env: { ...process.env, GH_TOKEN: token },
-            });
-            const commit = JSON.parse(commitJson);
-            return {
-                sha,
-                message: commit.commit.message,
-                authorName: commit.commit.author.name,
-                authorEmail: commit.commit.author.email,
-            };
-        }
-        catch (error) {
-            core.warning(`Failed to fetch commit details via gh CLI: ${error}`);
-            // Fallback to PR title and author
-            return {
-                sha,
-                message: pr.title,
-                authorName: pr.user.login,
-                authorEmail: `${pr.user.login}@users.noreply.github.com`,
-            };
-        }
+        core.debug(`PR event detected, head SHA: ${pr.head.sha}`);
+        return {
+            sha: pr.head.sha,
+            message: pr.title,
+            authorName: pr.user.login,
+            authorEmail: `${pr.user.login}@users.noreply.github.com`,
+        };
     }
-    // For push events
+    // For push events - use commit data from payload
     if (eventName === 'push' && context.payload.head_commit) {
         const commit = context.payload.head_commit;
+        core.debug(`Push event detected, commit SHA: ${commit.id}`);
         return {
             sha: commit.id,
             message: commit.message,
