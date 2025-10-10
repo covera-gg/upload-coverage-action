@@ -1,0 +1,57 @@
+name: 'Upload Coverage to Covera.gg'
+description: 'Automatically upload code coverage reports to Covera.gg'
+author: 'Covera.gg'
+branding:
+  icon: 'check-circle'
+  color: 'green'
+
+inputs:
+  api-key:
+    description: 'Covera.gg API key (store in secrets.COVERA_GG_KEY)'
+    required: true
+
+  repository:
+    description: 'Repository name (defaults to github.repository)'
+    required: false
+    default: ''
+
+  coverage-files:
+    description: 'Glob pattern for coverage files (auto-detected if not specified)'
+    required: false
+    default: |
+      **/*coverage*.xml
+      **/coverage.xml
+      **/clover.xml
+      **/*.info
+      **/lcov.info
+      **/*coverage*.out
+      **/coverage.out
+
+  branch:
+    description: 'Branch name (auto-detected from github context)'
+    required: false
+    default: ''
+
+  fail-on-error:
+    description: 'Fail workflow if upload fails'
+    required: false
+    default: 'true'
+
+  api-url:
+    description: 'Covera.gg API URL (for testing)'
+    required: false
+    default: 'https://api.covera.gg'
+
+outputs:
+  coverage-url:
+    description: 'URL to view the uploaded coverage report'
+
+  files-uploaded:
+    description: 'Number of coverage files uploaded'
+
+  status:
+    description: 'Upload status (success or failed)'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
