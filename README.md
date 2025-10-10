@@ -251,20 +251,6 @@ Add the action to your workflow file (e.g., `.github/workflows/test.yml`):
 
 **Solution**: Check that your API key is correct and stored in `secrets.COVERA_GG_KEY`
 
-### PR events: Failed to fetch commit details
-
-**Solution**: Ensure `GITHUB_TOKEN` has permissions:
-
-```yaml
-jobs:
-  test:
-    permissions:
-      contents: read
-      pull-requests: read
-```
-
-The action will fallback to PR title/author if commit details can't be fetched.
-
 ## Development
 
 ### Build
