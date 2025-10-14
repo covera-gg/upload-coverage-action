@@ -2,6 +2,7 @@ import * as core from '@actions/core'
 import * as fs from 'fs'
 import * as path from 'path'
 import { HttpClient } from '@actions/http-client'
+import type { PathNormalizationContext } from './context'
 
 export interface UploadOptions {
   apiKey: string
@@ -13,6 +14,7 @@ export interface UploadOptions {
   authorName: string
   authorEmail: string
   coverageFiles: string[]
+  pathContext?: PathNormalizationContext
 }
 
 export interface UploadResult {
@@ -24,7 +26,7 @@ export interface UploadResult {
  * Uploads coverage files to Covera.gg API
  */
 export async function uploadCoverage(options: UploadOptions): Promise<UploadResult> {
-  const { apiKey, apiUrl, repository, branch, commitSha, commitMessage, authorName, authorEmail, coverageFiles } = options
+  const { apiKey, apiUrl, repository, branch, commitSha, commitMessage, authorName, authorEmail, coverageFiles, pathContext } = options
 
   // Covera.gg API expects multipart/form-data
   const boundary = `----CoveraUpload${Date.now()}`
@@ -41,6 +43,19 @@ export async function uploadCoverage(options: UploadOptions): Promise<UploadResu
     commit_message: commitMessage,
     author_name: authorName,
     author_email: authorEmail,
+  }
+
+  // Add path normalization context if available
+  if (pathContext) {
+    if (pathContext.workingDirectory) {
+      fields.working_directory = pathContext.workingDirectory
+    }
+    if (pathContext.goModulePath) {
+      fields.go_module_path = pathContext.goModulePath
+    }
+    if (pathContext.repoRoot) {
+      fields.repo_root = pathContext.repoRoot
+    }
   }
 
   for (const [key, value] of Object.entries(fields)) {

@@ -3,12 +3,14 @@ import * as github from '@actions/github'
 import { detectCommitInfo } from './commit'
 import { findCoverageFiles } from './files'
 import { uploadCoverage } from './upload'
+import { detectPathContext } from './context'
 
 async function run(): Promise<void> {
   try {
     // Get inputs
     const apiKey = core.getInput('api-key', { required: true })
     const repository = core.getInput('repository') || process.env.GITHUB_REPOSITORY || ''
+    const workingDirectoryInput = core.getInput('working-directory') || undefined
 
     // Determine branch name: For PRs use head ref, otherwise use ref name
     let branch = core.getInput('branch')
@@ -56,7 +58,11 @@ async function run(): Promise<void> {
       core.info(`  - ${file}`)
     }
 
-    // Step 3: Upload to Covera.gg
+    // Step 3: Detect path normalization context
+    core.info('🔍 Detecting path normalization context...')
+    const pathContext = await detectPathContext(coverageFiles, workingDirectoryInput)
+
+    // Step 4: Upload to Covera.gg
     core.info('⬆️  Uploading to Covera.gg...')
     const result = await uploadCoverage({
       apiKey,
@@ -68,6 +74,7 @@ async function run(): Promise<void> {
       authorName: commitInfo.authorName,
       authorEmail: commitInfo.authorEmail,
       coverageFiles,
+      pathContext,
     })
 
     // Set outputs

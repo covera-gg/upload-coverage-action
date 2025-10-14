@@ -32456,6 +32456,175 @@ async function detectCommitInfo() {
 
 /***/ }),
 
+/***/ 8637:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.detectPathContext = detectPathContext;
+const core = __importStar(__nccwpck_require__(6966));
+const fs = __importStar(__nccwpck_require__(9896));
+const path = __importStar(__nccwpck_require__(6928));
+/**
+ * Detects path normalization context to help backend correctly match coverage paths
+ * with GitHub file paths
+ */
+async function detectPathContext(coverageFiles, workingDirectoryInput) {
+    const repoRoot = process.env.GITHUB_WORKSPACE || process.cwd();
+    // Use explicit working directory if provided
+    if (workingDirectoryInput) {
+        core.info(`Using explicit working directory: ${workingDirectoryInput}`);
+        const goModulePath = await detectGoModulePath(path.join(repoRoot, workingDirectoryInput));
+        return {
+            workingDirectory: workingDirectoryInput,
+            goModulePath,
+            repoRoot,
+        };
+    }
+    // Auto-detect from Go coverage files
+    const goCoverageFiles = coverageFiles.filter((f) => f.endsWith('.out'));
+    if (goCoverageFiles.length > 0) {
+        const workingDir = await autoDetectGoWorkingDirectory(goCoverageFiles[0], repoRoot);
+        const goModulePath = await detectGoModulePath(workingDir ? path.join(repoRoot, workingDir) : repoRoot);
+        if (workingDir || goModulePath) {
+            core.info(`Auto-detected Go context:`);
+            if (workingDir)
+                core.info(`  Working directory: ${workingDir}`);
+            if (goModulePath)
+                core.info(`  Module path: ${goModulePath}`);
+            return {
+                workingDirectory: workingDir,
+                goModulePath,
+                repoRoot,
+            };
+        }
+    }
+    // Auto-detect from frontend coverage files
+    const frontendCoverageFiles = coverageFiles.filter((f) => f.includes('clover.xml') || f.includes('lcov.info'));
+    if (frontendCoverageFiles.length > 0) {
+        const workingDir = await autoDetectFrontendWorkingDirectory(frontendCoverageFiles[0], repoRoot);
+        if (workingDir) {
+            core.info(`Auto-detected frontend working directory: ${workingDir}`);
+            return {
+                workingDirectory: workingDir,
+                repoRoot,
+            };
+        }
+    }
+    return { repoRoot };
+}
+/**
+ * Auto-detects working directory for Go projects by finding go.mod
+ */
+async function autoDetectGoWorkingDirectory(coverageFile, repoRoot) {
+    try {
+        // Start from coverage file directory and walk up to find go.mod
+        let currentDir = path.dirname(path.resolve(coverageFile));
+        const absoluteRepoRoot = path.resolve(repoRoot);
+        while (currentDir.startsWith(absoluteRepoRoot)) {
+            const goModPath = path.join(currentDir, 'go.mod');
+            if (fs.existsSync(goModPath)) {
+                // Return path relative to repo root
+                const relativePath = path.relative(absoluteRepoRoot, currentDir);
+                return relativePath || undefined;
+            }
+            const parentDir = path.dirname(currentDir);
+            if (parentDir === currentDir)
+                break; // Reached filesystem root
+            currentDir = parentDir;
+        }
+    }
+    catch (error) {
+        core.debug(`Error auto-detecting Go working directory: ${error}`);
+    }
+    return undefined;
+}
+/**
+ * Auto-detects working directory for frontend projects by finding package.json
+ */
+async function autoDetectFrontendWorkingDirectory(coverageFile, repoRoot) {
+    try {
+        // Start from coverage file directory and walk up to find package.json
+        let currentDir = path.dirname(path.resolve(coverageFile));
+        const absoluteRepoRoot = path.resolve(repoRoot);
+        while (currentDir.startsWith(absoluteRepoRoot)) {
+            const packageJsonPath = path.join(currentDir, 'package.json');
+            if (fs.existsSync(packageJsonPath)) {
+                // Return path relative to repo root
+                const relativePath = path.relative(absoluteRepoRoot, currentDir);
+                return relativePath || undefined;
+            }
+            const parentDir = path.dirname(currentDir);
+            if (parentDir === currentDir)
+                break; // Reached filesystem root
+            currentDir = parentDir;
+        }
+    }
+    catch (error) {
+        core.debug(`Error auto-detecting frontend working directory: ${error}`);
+    }
+    return undefined;
+}
+/**
+ * Detects Go module path from go.mod file
+ */
+async function detectGoModulePath(searchDir) {
+    try {
+        const goModPath = path.join(searchDir, 'go.mod');
+        if (!fs.existsSync(goModPath)) {
+            return undefined;
+        }
+        const goModContent = fs.readFileSync(goModPath, 'utf-8');
+        const moduleLineMatch = goModContent.match(/^module\s+([^\s]+)/m);
+        if (moduleLineMatch && moduleLineMatch[1]) {
+            const modulePath = moduleLineMatch[1].trim();
+            core.debug(`Found Go module path: ${modulePath}`);
+            return modulePath;
+        }
+    }
+    catch (error) {
+        core.debug(`Error detecting Go module path: ${error}`);
+    }
+    return undefined;
+}
+
+
+/***/ }),
+
 /***/ 5713:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -32570,11 +32739,13 @@ const github = __importStar(__nccwpck_require__(4903));
 const commit_1 = __nccwpck_require__(4525);
 const files_1 = __nccwpck_require__(5713);
 const upload_1 = __nccwpck_require__(1773);
+const context_1 = __nccwpck_require__(8637);
 async function run() {
     try {
         // Get inputs
         const apiKey = core.getInput('api-key', { required: true });
         const repository = core.getInput('repository') || process.env.GITHUB_REPOSITORY || '';
+        const workingDirectoryInput = core.getInput('working-directory') || undefined;
         // Determine branch name: For PRs use head ref, otherwise use ref name
         let branch = core.getInput('branch');
         if (!branch) {
@@ -32616,7 +32787,10 @@ async function run() {
         for (const file of coverageFiles) {
             core.info(`  - ${file}`);
         }
-        // Step 3: Upload to Covera.gg
+        // Step 3: Detect path normalization context
+        core.info('🔍 Detecting path normalization context...');
+        const pathContext = await (0, context_1.detectPathContext)(coverageFiles, workingDirectoryInput);
+        // Step 4: Upload to Covera.gg
         core.info('⬆️  Uploading to Covera.gg...');
         const result = await (0, upload_1.uploadCoverage)({
             apiKey,
@@ -32628,6 +32802,7 @@ async function run() {
             authorName: commitInfo.authorName,
             authorEmail: commitInfo.authorEmail,
             coverageFiles,
+            pathContext,
         });
         // Set outputs
         core.setOutput('status', 'success');
@@ -32699,7 +32874,7 @@ const http_client_1 = __nccwpck_require__(1966);
  * Uploads coverage files to Covera.gg API
  */
 async function uploadCoverage(options) {
-    const { apiKey, apiUrl, repository, branch, commitSha, commitMessage, authorName, authorEmail, coverageFiles } = options;
+    const { apiKey, apiUrl, repository, branch, commitSha, commitMessage, authorName, authorEmail, coverageFiles, pathContext } = options;
     // Covera.gg API expects multipart/form-data
     const boundary = `----CoveraUpload${Date.now()}`;
     const client = new http_client_1.HttpClient('covera-upload-action');
@@ -32714,6 +32889,18 @@ async function uploadCoverage(options) {
         author_name: authorName,
         author_email: authorEmail,
     };
+    // Add path normalization context if available
+    if (pathContext) {
+        if (pathContext.workingDirectory) {
+            fields.working_directory = pathContext.workingDirectory;
+        }
+        if (pathContext.goModulePath) {
+            fields.go_module_path = pathContext.goModulePath;
+        }
+        if (pathContext.repoRoot) {
+            fields.repo_root = pathContext.repoRoot;
+        }
+    }
     for (const [key, value] of Object.entries(fields)) {
         parts.push(Buffer.from(`--${boundary}\r\n` +
             `Content-Disposition: form-data; name="${key}"\r\n\r\n` +
@@ -32751,7 +32938,7 @@ async function uploadCoverage(options) {
     const result = JSON.parse(responseBody);
     return {
         reportId: result.report_id || result.id || 'unknown',
-        reportUrl: result.report_url || `${apiUrl.replace('/api', '')}/reports/${result.report_id || result.id}`,
+        reportUrl: result.report_url || '', // API should provide the report URL
     };
 }
 

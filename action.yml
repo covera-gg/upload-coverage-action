@@ -32,6 +32,11 @@ inputs:
     required: false
     default: ''
 
+  working-directory:
+    description: 'Working directory where tests ran (auto-detected from go.mod/package.json if not specified)'
+    required: false
+    default: ''
+
   fail-on-error:
     description: 'Fail workflow if upload fails'
     required: false
