@@ -129,7 +129,7 @@ function summariseCoverageFiles(coverageFiles: string[], repoRoot: string): Cove
   for (const file of coverageFiles) {
     const resolved = path.isAbsolute(file) ? file : path.resolve(repoRoot, file)
     const relative = path.relative(repoRoot, resolved)
-    const isInsideRepo = relative && !relative.startsWith('..') && !path.isAbsolute(relative)
+    const isInsideRepo = !relative.startsWith('..') && !path.isAbsolute(relative)
 
     const basename = path.basename(resolved)
     basenameCounts.set(basename, (basenameCounts.get(basename) ?? 0) + 1)
