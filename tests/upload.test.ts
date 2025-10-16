@@ -160,6 +160,38 @@ describe('uploadCoverage', () => {
       expect(body).toContain('name="files[]"')
       expect(body).toContain('filename="clover.xml"')
     })
+
+    it('should include PR metadata when provided', async () => {
+      vi.mocked(fs.readFileSync).mockReturnValue(Buffer.from('file content'))
+
+      const mockResponse = {
+        message: { statusCode: 200 },
+        readBody: vi.fn().mockResolvedValue(JSON.stringify({ id: 'test' })),
+      }
+
+      const mockPost = vi.fn().mockResolvedValue(mockResponse)
+      vi.mocked(HttpClient).mockImplementation(
+        () =>
+          ({
+            post: mockPost,
+          }) as any
+      )
+
+      await uploadCoverage({
+        ...mockOptions,
+        prNumber: 41,
+        prBaseBranch: 'main',
+        prBaseSha: 'base123',
+      })
+
+      const body = mockPost.mock.calls[0][1]
+      expect(body).toContain('name="pr_number"')
+      expect(body).toContain('41')
+      expect(body).toContain('name="pr_base_branch"')
+      expect(body).toContain('main')
+      expect(body).toContain('name="pr_base_sha"')
+      expect(body).toContain('base123')
+    })
   })
 
   describe('error handling', () => {

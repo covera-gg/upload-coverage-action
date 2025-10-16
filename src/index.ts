@@ -13,14 +13,27 @@ async function run(): Promise<void> {
     const workingDirectoryInput = core.getInput('working-directory') || undefined
 
     // Determine branch name: For PRs use head ref, otherwise use ref name
+    const context = github.context
+
     let branch = core.getInput('branch')
     if (!branch) {
-      const context = github.context
-      if (context.eventName === 'pull_request' && context.payload.pull_request) {
+      if (context.eventName?.startsWith('pull_request') && context.payload.pull_request) {
         branch = context.payload.pull_request.head.ref
       } else {
         branch = process.env.GITHUB_REF_NAME || ''
       }
+    }
+
+    let prNumber: number | undefined
+    let prBaseBranch: string | undefined
+    let prBaseSha: string | undefined
+
+    if (context.eventName?.startsWith('pull_request') && context.payload.pull_request) {
+      const pr = context.payload.pull_request
+      prNumber = pr.number
+      prBaseBranch = pr.base?.ref
+      prBaseSha = pr.base?.sha
+      core.info(`Pull request detected: #${prNumber} (base: ${prBaseBranch ?? 'unknown'})`)
     }
 
     const coverageFilesPattern = core.getInput('coverage-files')
@@ -75,6 +88,9 @@ async function run(): Promise<void> {
       authorEmail: commitInfo.authorEmail,
       coverageFiles,
       pathContext,
+      prNumber,
+      prBaseBranch,
+      prBaseSha,
     })
 
     // Set outputs
