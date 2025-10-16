@@ -1,25 +1,89 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// We can't easily test index.ts as it executes immediately on import
-// Instead, we'll test the integration by verifying the module can be loaded
-// and that our other units (commit, files, upload) are well-tested
-
-describe('index module integration', () => {
-  it('should export the run function implicitly via module execution', async () => {
-    // The index.ts file executes run() automatically
-    // This test verifies the module can be imported without errors
-    const indexModule = await import('../src/index')
-    expect(indexModule).toBeDefined()
-  })
+vi.mock('@actions/core', () => {
+  const outputs: Record<string, string> = {}
+  return {
+    getInput: vi.fn((name: string, opts?: { required?: boolean }) => {
+      if (name === 'api-key') {
+        if (opts?.required) {
+          return 'fake-api-key'
+        }
+        return 'fake-api-key'
+      }
+      if (name === 'coverage-files') {
+        return 'coverage/*.xml'
+      }
+      if (name === 'fail-on-error') {
+        return 'false'
+      }
+      if (name === 'api-url') {
+        return 'https://api.test'
+      }
+      return ''
+    }),
+    setOutput: vi.fn((name: string, value: string) => {
+      outputs[name] = value
+    }),
+    setFailed: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    debug: vi.fn(),
+  }
 })
 
-// Note: The main orchestration logic in index.ts is covered by:
-// 1. Unit tests for commit.ts (commit detection logic)
-// 2. Unit tests for files.ts (file discovery logic)
-// 3. Unit tests for upload.ts (upload logic)
-// 4. End-to-end testing via the GitHub Action workflow
-//
-// Testing index.ts directly is challenging because it:
-// - Executes immediately on import (side effects)
-// - Uses process.env and @actions/core which require complex mocking
-// - Is better tested via integration tests in CI
+vi.mock('@actions/github', () => ({
+  context: {
+    eventName: 'pull_request',
+    payload: {
+      pull_request: {
+        head: { ref: 'feature/test', sha: 'abcdef1234567890' },
+        base: { ref: 'main', sha: 'fedcba0987654321' },
+        number: 41,
+        title: 'Test PR',
+        user: { login: 'octocat', email: 'octocat@example.com' },
+      },
+    },
+  },
+}))
+
+vi.mock('../src/commit', () => ({
+  detectCommitInfo: vi.fn().mockResolvedValue({
+    sha: 'abcdef1234567890',
+    message: 'Test commit',
+    authorName: 'Octo Cat',
+    authorEmail: 'octo@example.com',
+  }),
+}))
+
+vi.mock('../src/files', () => ({
+  findCoverageFiles: vi.fn().mockResolvedValue(['coverage/clover.xml']),
+}))
+
+vi.mock('../src/context', () => ({
+  detectPathContext: vi.fn().mockResolvedValue({}),
+}))
+
+vi.mock('../src/upload', () => ({
+  uploadCoverage: vi.fn().mockResolvedValue({
+    reportUrl: 'https://covera.gg/reports/123',
+    reportId: '123',
+  }),
+}))
+
+describe('index module integration', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('runs without throwing when dependencies are mocked', async () => {
+    await expect(import('../src/index')).resolves.toBeDefined()
+    const { uploadCoverage } = await import('../src/upload')
+    expect(uploadCoverage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prNumber: 41,
+        prBaseBranch: 'main',
+        prBaseSha: 'fedcba0987654321',
+      })
+    )
+  })
+})
