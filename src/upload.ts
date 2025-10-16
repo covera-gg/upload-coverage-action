@@ -15,6 +15,9 @@ export interface UploadOptions {
   authorEmail: string
   coverageFiles: string[]
   pathContext?: PathNormalizationContext
+  prNumber?: number
+  prBaseBranch?: string
+  prBaseSha?: string
 }
 
 export interface UploadResult {
@@ -26,7 +29,21 @@ export interface UploadResult {
  * Uploads coverage files to Covera.gg API
  */
 export async function uploadCoverage(options: UploadOptions): Promise<UploadResult> {
-  const { apiKey, apiUrl, repository, branch, commitSha, commitMessage, authorName, authorEmail, coverageFiles, pathContext } = options
+  const {
+    apiKey,
+    apiUrl,
+    repository,
+    branch,
+    commitSha,
+    commitMessage,
+    authorName,
+    authorEmail,
+    coverageFiles,
+    pathContext,
+    prNumber,
+    prBaseBranch,
+    prBaseSha,
+  } = options
 
   // Covera.gg API expects multipart/form-data
   const boundary = `----CoveraUpload${Date.now()}`
@@ -56,6 +73,16 @@ export async function uploadCoverage(options: UploadOptions): Promise<UploadResu
     if (pathContext.repoRoot) {
       fields.repo_root = pathContext.repoRoot
     }
+  }
+
+  if (typeof prNumber === 'number' && !Number.isNaN(prNumber)) {
+    fields.pr_number = prNumber.toString()
+  }
+  if (prBaseBranch) {
+    fields.pr_base_branch = prBaseBranch
+  }
+  if (prBaseSha) {
+    fields.pr_base_sha = prBaseSha
   }
 
   for (const [key, value] of Object.entries(fields)) {

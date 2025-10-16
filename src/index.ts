@@ -13,13 +13,58 @@ async function run(): Promise<void> {
     const workingDirectoryInput = core.getInput('working-directory') || undefined
 
     // Determine branch name: For PRs use head ref, otherwise use ref name
+    const context = github.context
+
     let branch = core.getInput('branch')
     if (!branch) {
-      const context = github.context
-      if (context.eventName === 'pull_request' && context.payload.pull_request) {
+      if (context.eventName?.startsWith('pull_request') && context.payload.pull_request) {
         branch = context.payload.pull_request.head.ref
       } else {
         branch = process.env.GITHUB_REF_NAME || ''
+      }
+    }
+
+    let prNumber: number | undefined
+    let prBaseBranch: string | undefined
+    let prBaseSha: string | undefined
+
+    if (context.eventName?.startsWith('pull_request') && context.payload.pull_request) {
+      const pr = context.payload.pull_request
+      prNumber = pr.number
+      prBaseBranch = pr.base?.ref
+      prBaseSha = pr.base?.sha
+      core.info(`Pull request detected from event payload: #${prNumber} (base: ${prBaseBranch ?? 'unknown'})`)
+    }
+
+    if (prNumber === undefined) {
+      const githubToken = process.env.GITHUB_TOKEN
+      if (githubToken) {
+        try {
+          const octokit = github.getOctokit(githubToken)
+          const [owner, repoName] = repository.split('/')
+          if (owner && repoName && branch) {
+            const { data: prs } = await octokit.rest.pulls.list({
+              owner,
+              repo: repoName,
+              state: 'open',
+              head: `${owner}:${branch}`,
+              per_page: 1,
+            })
+            if (prs.length > 0) {
+              const pr = prs[0]
+              prNumber = pr.number
+              prBaseBranch = pr.base.ref
+              prBaseSha = pr.base.sha
+              core.info(`Pull request detected via API: #${prNumber} (base: ${prBaseBranch})`)
+            } else {
+              core.info(`No open pull request found for ${owner}:${branch}`)
+            }
+          }
+        } catch (err) {
+          core.warning(`Unable to look up pull request metadata: ${err}`)
+        }
+      } else {
+        core.info('No GITHUB_TOKEN available; skipping PR metadata lookup')
       }
     }
 
@@ -75,6 +120,9 @@ async function run(): Promise<void> {
       authorEmail: commitInfo.authorEmail,
       coverageFiles,
       pathContext,
+      prNumber,
+      prBaseBranch,
+      prBaseSha,
     })
 
     // Set outputs
