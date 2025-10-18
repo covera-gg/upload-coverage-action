@@ -33,17 +33,23 @@ vi.mock('@actions/core', () => {
 
 vi.mock('@actions/github', () => ({
   context: {
-    eventName: 'pull_request',
-    payload: {
-      pull_request: {
-        head: { ref: 'feature/test', sha: 'abcdef1234567890' },
-        base: { ref: 'main', sha: 'fedcba0987654321' },
-        number: 41,
-        title: 'Test PR',
-        user: { login: 'octocat', email: 'octocat@example.com' },
+    eventName: 'workflow_dispatch',
+    payload: {},
+  },
+  getOctokit: vi.fn().mockReturnValue({
+    rest: {
+      pulls: {
+        list: vi.fn().mockResolvedValue({
+          data: [
+            {
+              number: 41,
+              base: { ref: 'main', sha: 'fedcba0987654321' },
+            },
+          ],
+        }),
       },
     },
-  },
+  }),
 }))
 
 vi.mock('../src/commit', () => ({
@@ -70,6 +76,9 @@ vi.mock('../src/upload', () => ({
 describe('index module integration', () => {
   beforeEach(() => {
     vi.resetModules()
+    process.env.GITHUB_TOKEN = 'test-token'
+    process.env.GITHUB_REPOSITORY = 'covera-gg/covera-app'
+    process.env.GITHUB_REF_NAME = 'feature/test'
   })
 
   it('runs without throwing when dependencies are mocked', async () => {

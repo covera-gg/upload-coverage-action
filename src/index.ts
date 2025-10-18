@@ -31,7 +31,39 @@ async function run(): Promise<void> {
       prNumber = pr.number
       prBaseBranch = pr.base?.ref
       prBaseSha = pr.base?.sha
-      core.info(`Pull request detected: #${prNumber} (base: ${prBaseBranch ?? 'unknown'})`)
+      core.info(`Pull request detected from event payload: #${prNumber} (base: ${prBaseBranch ?? 'unknown'})`)
+    }
+
+    if (prNumber === undefined) {
+      const githubToken = process.env.GITHUB_TOKEN
+      if (githubToken) {
+        try {
+          const octokit = github.getOctokit(githubToken)
+          const [owner, repoName] = repository.split('/')
+          if (owner && repoName && branch) {
+            const { data: prs } = await octokit.rest.pulls.list({
+              owner,
+              repo: repoName,
+              state: 'open',
+              head: `${owner}:${branch}`,
+              per_page: 1,
+            })
+            if (prs.length > 0) {
+              const pr = prs[0]
+              prNumber = pr.number
+              prBaseBranch = pr.base.ref
+              prBaseSha = pr.base.sha
+              core.info(`Pull request detected via API: #${prNumber} (base: ${prBaseBranch})`)
+            } else {
+              core.info(`No open pull request found for ${owner}:${branch}`)
+            }
+          }
+        } catch (err) {
+          core.warning(`Unable to look up pull request metadata: ${err}`)
+        }
+      } else {
+        core.info('No GITHUB_TOKEN available; skipping PR metadata lookup')
+      }
     }
 
     const coverageFilesPattern = core.getInput('coverage-files')
