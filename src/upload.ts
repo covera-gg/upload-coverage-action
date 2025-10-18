@@ -2,7 +2,6 @@ import * as core from '@actions/core'
 import * as fs from 'fs'
 import * as path from 'path'
 import { HttpClient } from '@actions/http-client'
-import type { PathNormalizationContext } from './context'
 
 export interface UploadOptions {
   apiKey: string
@@ -14,7 +13,6 @@ export interface UploadOptions {
   authorName: string
   authorEmail: string
   coverageFiles: string[]
-  pathContext?: PathNormalizationContext
   prNumber?: number
   prBaseBranch?: string
   prBaseSha?: string
@@ -39,7 +37,6 @@ export async function uploadCoverage(options: UploadOptions): Promise<UploadResu
     authorName,
     authorEmail,
     coverageFiles,
-    pathContext,
     prNumber,
     prBaseBranch,
     prBaseSha,
@@ -62,18 +59,6 @@ export async function uploadCoverage(options: UploadOptions): Promise<UploadResu
     author_email: authorEmail,
   }
 
-  // Add path normalization context if available
-  if (pathContext) {
-    if (pathContext.workingDirectory) {
-      fields.working_directory = pathContext.workingDirectory
-    }
-    if (pathContext.goModulePath) {
-      fields.go_module_path = pathContext.goModulePath
-    }
-    if (pathContext.repoRoot) {
-      fields.repo_root = pathContext.repoRoot
-    }
-  }
 
   if (typeof prNumber === 'number' && !Number.isNaN(prNumber)) {
     fields.pr_number = prNumber.toString()

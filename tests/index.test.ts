@@ -59,9 +59,6 @@ vi.mock('../src/files', () => ({
   findCoverageFiles: vi.fn().mockResolvedValue(['coverage/clover.xml']),
 }))
 
-vi.mock('../src/context', () => ({
-  detectPathContext: vi.fn().mockResolvedValue({}),
-}))
 
 vi.mock('../src/upload', () => ({
   uploadCoverage: vi.fn().mockResolvedValue({
